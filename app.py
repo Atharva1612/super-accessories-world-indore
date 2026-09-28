@@ -148,8 +148,6 @@ def admin_dashboard():
 
 @app.route('/staff/<shop_slug>')
 def staff_dashboard(shop_slug):
-    # Staff page is open to anyone with the URL. 
-    # Security note: Admin features/data are fully walled off by the session requirements on other routes.
     shop = get_shop_by_slug(shop_slug)
     if not shop:
         abort(404)
@@ -265,23 +263,6 @@ def api_admin_orders():
         finally:
             db.close()
 
-@app.route('/api/orders/<int:order_id>/complete', methods=['POST'])
-@login_required
-def api_admin_order_complete(order_id):
-    db = get_db()
-    shop_id = session['shop_id']
-    # Ensures admin can only complete orders belonging to their own shop
-    cursor = db.cursor()
-    cursor.execute("UPDATE orders SET status = 'Completed' WHERE id = ? AND shop_id = ?", (order_id, shop_id))
-    db.commit()
-    affected = cursor.rowcount
-    db.close()
-    
-    if affected == 0:
-        return jsonify({'error': 'Order not found or unauthorized'}), 404
-    return jsonify({'success': True})
-
-
 # --- API Routes (Staff Workflow) ---
 
 @app.route('/api/staff/<shop_slug>/orders', methods=['GET', 'PUT'])
@@ -294,7 +275,6 @@ def api_staff_orders(shop_slug):
     db = get_db()
     
     if request.method == 'GET':
-        # Staff sees all orders so they can check them or view history
         orders = db.execute("SELECT * FROM orders WHERE shop_id = ? ORDER BY created_at DESC", (shop_id,)).fetchall()
         result = []
         for o in orders:
@@ -315,25 +295,47 @@ def api_staff_orders(shop_slug):
         order_id = data.get('order_id')
         items_updates = data.get('items', [])
         
-        # Verify the order actually belongs to this staff's shop
-        order = db.execute("SELECT id FROM orders WHERE id = ? AND shop_id = ?", (order_id, shop_id)).fetchone()
+        order = db.execute("SELECT id, status FROM orders WHERE id = ? AND shop_id = ?", (order_id, shop_id)).fetchone()
         if not order:
             db.close()
             return jsonify({'error': 'Order not found or unauthorized'}), 403
             
+        if order['status'] == 'Completed':
+            db.close()
+            return jsonify({'error': 'Order is already completed'}), 400
+            
         cursor = db.cursor()
         try:
             for item in items_updates:
+                avail_qty = int(item['available_qty'])
+                item_id = item['item_id']
+                
+                # Retrieve the specific part ID for stock deduction
+                oi = cursor.execute("SELECT part_id FROM order_items WHERE id = ? AND order_id = ?", (item_id, order_id)).fetchone()
+                if not oi:
+                    continue
+                    
+                part_id = oi['part_id']
+                
+                # Update the order line item remarks and quantity
                 cursor.execute('''
                     UPDATE order_items 
                     SET available_qty = ?, remarks = ? 
-                    WHERE id = ? AND order_id = ?
-                ''', (int(item['available_qty']), item.get('remarks', ''), item['item_id'], order_id))
+                    WHERE id = ?
+                ''', (avail_qty, item.get('remarks', ''), item_id))
+                
+                # Automatically deduct from inventory stock
+                if avail_qty > 0:
+                    cursor.execute("UPDATE parts SET quantity = quantity - ? WHERE id = ?", (avail_qty, part_id))
             
-            # Staff updates mark the order as Checked
-            cursor.execute("UPDATE orders SET status = 'Checked' WHERE id = ?", (order_id,))
+            # Change status directly to Completed
+            cursor.execute("UPDATE orders SET status = 'Completed' WHERE id = ?", (order_id,))
             db.commit()
             return jsonify({'success': True})
+            
+        except sqlite3.IntegrityError:
+            db.rollback()
+            return jsonify({'error': 'Insufficient stock! Deducting these items would cause negative inventory. Please adjust stock levels first.'}), 400
         except Exception as e:
             db.rollback()
             return jsonify({'error': str(e)}), 400

@@ -2,156 +2,475 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Two-Wheeler Spare Parts Shop Stock and Order Management System">
+    <title>MotoStock • {{ shop_name if shop_name else 'Management' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <div id="notification-container"></div>
+<body class="{% if view_mode == 'staff' %}staff-mode{% endif %}">
 
     {% if view_mode == 'login' %}
-    <div class="login-container">
-        <h2>Admin Login</h2>
-        {% if error %}
-            <p class="error">{{ error }}</p>
-        {% endif %}
-        <form method="POST" action="/">
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" name="username" required>
+    <div class="login-wrapper">
+        <div class="panel-card login-card">
+            <div class="brand-block" style="justify-content: center; margin-bottom: 20px; padding:0;">
+                <div class="brand-mark">M</div>
+                <div>
+                    <div class="brand-name" style="color: var(--text);">MotoStock</div>
+                    <div class="brand-subtitle">Spare Parts Manager</div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Password</label>
-                <input type="password" name="password" required>
+            <h2 style="text-align: center; margin-bottom: 20px; font-size: 20px;">Admin Login</h2>
+            
+            {% if error %}
+            <div style="background: var(--red-soft); color: var(--red); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: center; border: 1px solid #fecaca;">
+                {{ error }}
             </div>
-            <button type="submit" class="btn primary">Login</button>
-        </form>
-    </div>
+            {% endif %}
 
-    {% elif view_mode == 'admin' %}
-    <!-- Include global JS variable so the frontend knows we are in admin mode -->
-    <script>window.APP_MODE = 'admin';</script>
-    <div class="dashboard">
-        <header>
-            <h2>Admin: {{ shop_name }}</h2>
-            <nav>
-                <button class="tab-btn active" onclick="switchTab('inventory-tab')">Inventory</button>
-                <button class="tab-btn" onclick="switchTab('orders-tab')">Orders</button>
-                <a href="{{ url_for('logout') }}" class="btn danger">Logout</a>
-            </nav>
-        </header>
-        
-        <main>
-            <!-- INVENTORY TAB -->
-            <section id="inventory-tab" class="tab-content active">
-                <div class="toolbar">
-                    <input type="text" id="search-inventory" placeholder="Search parts..." onkeyup="filterInventory()">
-                    <button class="btn primary" onclick="openPartModal()">+ Add Part</button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Category</th>
-                                <th>Quantity</th>
-                                <th>Price (Sell)</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- ORDERS TAB -->
-            <section id="orders-tab" class="tab-content">
-                <div class="toolbar">
-                    <button class="btn primary" onclick="openOrderModal()">+ New Order</button>
-                </div>
-                <div id="orders-container">
-                    <!-- Populated by JS -->
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- ADD/EDIT PART MODAL -->
-    <div id="part-modal" class="modal">
-        <div class="modal-content">
-            <h3 id="part-modal-title">Add Part</h3>
-            <form id="part-form" onsubmit="submitPart(event)">
-                <input type="hidden" id="part-id">
-                <div class="form-group"><label>Code</label><input type="text" id="part-code" required></div>
-                <div class="form-group"><label>Name</label><input type="text" id="part-name" required></div>
-                <div class="form-group"><label>Category</label><input type="text" id="part-category" required></div>
-                <div class="form-group"><label>Quantity in Stock</label><input type="number" id="part-quantity" min="0" required></div>
-                <div class="form-group"><label>Purchase Price</label><input type="number" step="0.01" id="part-purchase" min="0" required></div>
-                <div class="form-group"><label>Selling Price</label><input type="number" step="0.01" id="part-selling" min="0" required></div>
-                <div class="modal-actions">
-                    <button type="button" class="btn secondary" onclick="closeModal('part-modal')">Cancel</button>
-                    <button type="submit" class="btn primary">Save Part</button>
-                </div>
+            <form method="POST" action="/" class="stack-layout">
+                <label class="field-label">
+                    <span>Username</span>
+                    <input type="text" name="username" required>
+                </label>
+                <label class="field-label">
+                    <span>Password</span>
+                    <input type="password" name="password" required>
+                </label>
+                <button type="submit" class="primary-button" style="width: 100%; margin-top: 10px;">Login to Workspace</button>
             </form>
         </div>
     </div>
 
-    <!-- CREATE ORDER MODAL -->
-    <div id="order-modal" class="modal">
-        <div class="modal-content large">
-            <h3>Create New Order</h3>
-            <form id="order-form" onsubmit="submitOrder(event)">
-                <div class="form-group">
-                    <label>Customer/Party Name</label>
-                    <input type="text" id="order-customer" required>
-                </div>
-                <div class="order-items-builder">
-                    <h4>Select Items</h4>
-                    <select id="part-select">
-                        <!-- Populated by JS -->
-                    </select>
-                    <input type="number" id="requested-qty-input" placeholder="Req Qty" min="1">
-                    <button type="button" class="btn secondary" onclick="addPartToOrder()">Add to Order</button>
-                </div>
-                <table class="order-draft-table">
-                    <thead>
-                        <tr><th>Code</th><th>Name</th><th>Req Qty</th><th>Action</th></tr>
-                    </thead>
-                    <tbody id="order-draft-body">
-                        <!-- Draft items go here -->
-                    </tbody>
-                </table>
-                <div class="modal-actions">
-                    <button type="button" class="btn secondary" onclick="closeModal('order-modal')">Cancel</button>
-                    <button type="submit" class="btn primary">Submit Order</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {% elif view_mode == 'staff' %}
-    <!-- Staff view layout (To be populated in Phase 3) -->
-    <!-- Include global JS variables so the frontend knows we are in staff mode -->
+    {% else %}
     <script>
-        window.APP_MODE = 'staff';
-        window.SHOP_SLUG = '{{ shop_slug }}';
+        window.APP_MODE = '{{ view_mode }}';
+        window.SHOP_SLUG = '{{ shop_slug if shop_slug else "" }}';
+        window.SHOP_NAME = '{{ shop_name }}';
     </script>
-    <div class="dashboard">
-        <header>
-            <h2>Staff Dashboard: {{ shop_name }}</h2>
-        </header>
-        <main>
-            <div id="staff-orders-container">
-                <!-- Populated by JS -->
+    
+    <div class="app-shell">
+        <!-- Overlay for mobile sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <aside class="sidebar" id="sidebar">
+            <div class="brand-block">
+                <div class="brand-mark">M</div>
+                <div>
+                    <div class="brand-name">MotoStock</div>
+                    <div class="brand-subtitle">{{ shop_name }}</div>
+                </div>
             </div>
-        </main>
+
+            <nav class="sidebar-nav" aria-label="Main navigation">
+                {% if view_mode == 'admin' %}
+                <div class="nav-section-title">Admin</div>
+                <button class="nav-item active" data-view="admin-dashboard" type="button">
+                    <span class="nav-icon">▦</span>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" data-view="inventory" type="button">
+                    <span class="nav-icon">◫</span>
+                    <span>Inventory</span>
+                </button>
+                <button class="nav-item" data-view="create-order" type="button">
+                    <span class="nav-icon">＋</span>
+                    <span>Take Order</span>
+                </button>
+                {% endif %}
+
+                <div class="nav-section-title staff-only-nav">Staff Dashboard</div>
+                <button class="nav-item staff-only-nav {% if view_mode == 'staff' %}active{% endif %}" data-view="staff-orders" type="button">
+                    <span class="nav-icon">☷</span>
+                    <span>Orders</span>
+                </button>
+                <button class="nav-item staff-only-nav" data-view="staff-checking" type="button">
+                    <span class="nav-icon">✓</span>
+                    <span>Stock Checking</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <span class="status-dot"></span>
+                    <span>System Online</span>
+                </div>
+                {% if view_mode == 'admin' %}
+                <a href="{{ url_for('logout') }}" style="display:block; margin-top:15px; color: #9ca9bb; text-decoration: none; font-size: 13px; font-weight: 600;">← Logout</a>
+                {% endif %}
+            </div>
+        </aside>
+
+        <div class="main-panel">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="icon-button mobile-menu" id="mobileMenuButton" type="button" aria-label="Open menu">☰</button>
+                    <div>
+                        <div class="eyebrow" id="pageEyebrow">{{ view_mode | upper }} WORKSPACE</div>
+                        <h1 id="pageTitle">{{ 'Dashboard' if view_mode == 'admin' else 'Orders Queue' }}</h1>
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <div class="topbar-date" id="topbarDate">Today</div>
+                    <div class="avatar" title="Current role">{{ view_mode[0] | upper }}</div>
+                </div>
+            </header>
+
+            <main class="content-area">
+                {% if view_mode == 'admin' %}
+                <!-- ADMIN DASHBOARD -->
+                <section class="view-panel active" id="view-admin-dashboard" data-view-panel="admin-dashboard">
+                    <div class="view-heading">
+                        <div>
+                            <div class="section-kicker">Overview</div>
+                            <h2>Shop performance at a glance</h2>
+                            <p>Monitor stock, active orders and fulfilment status from one place.</p>
+                        </div>
+                        <button class="primary-button" data-go-view="create-order" type="button">
+                            <span>＋</span> Take New Order
+                        </button>
+                    </div>
+
+                    <div class="stats-grid">
+                        <article class="stat-card">
+                            <div class="stat-icon blue">◫</div>
+                            <div class="stat-copy">
+                                <span class="stat-label">Total Items</span>
+                                <strong class="stat-value" id="statTotalItems">0</strong>
+                            </div>
+                        </article>
+                        <article class="stat-card">
+                            <div class="stat-icon green">▥</div>
+                            <div class="stat-copy">
+                                <span class="stat-label">Total Stock</span>
+                                <strong class="stat-value" id="statTotalStock">0</strong>
+                            </div>
+                        </article>
+                        <article class="stat-card">
+                            <div class="stat-icon amber">◷</div>
+                            <div class="stat-copy">
+                                <span class="stat-label">Pending Orders</span>
+                                <strong class="stat-value" id="statPendingOrders">0</strong>
+                            </div>
+                        </article>
+                        <article class="stat-card">
+                            <div class="stat-icon purple">✓</div>
+                            <div class="stat-copy">
+                                <span class="stat-label">Completed Orders</span>
+                                <strong class="stat-value" id="statCompletedOrders">0</strong>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <section class="panel-card">
+                            <div class="panel-header">
+                                <div>
+                                    <div class="section-kicker">Recent activity</div>
+                                    <h3>Latest Orders</h3>
+                                </div>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table compact-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Order ID</th>
+                                            <th>Party</th>
+                                            <th>Date</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashboardOrdersBody">
+                                        <tr class="empty-row"><td colspan="4">Loading orders…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="panel-card quick-panel">
+                            <div class="panel-header">
+                                <div>
+                                    <div class="section-kicker">Quick actions</div>
+                                    <h3>Common Tasks</h3>
+                                </div>
+                            </div>
+                            <div class="quick-actions">
+                                <button class="quick-action" data-go-view="inventory" type="button">
+                                    <span class="quick-icon">◫</span>
+                                    <span><strong>Manage Inventory</strong><small>Add, edit or review parts</small></span>
+                                    <span class="quick-arrow">→</span>
+                                </button>
+                                <button class="quick-action" data-go-view="create-order" type="button">
+                                    <span class="quick-icon">＋</span>
+                                    <span><strong>Create Order</strong><small>Build a customer order</small></span>
+                                    <span class="quick-arrow">→</span>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <!-- INVENTORY -->
+                <section class="view-panel" id="view-inventory" data-view-panel="inventory">
+                    <div class="view-heading">
+                        <div>
+                            <div class="section-kicker">Catalog</div>
+                            <h2>Inventory Management</h2>
+                            <p>Manage spare parts, prices and available quantities.</p>
+                        </div>
+                        <button class="primary-button" id="openAddItemButton" type="button">
+                            <span>＋</span> Add Item
+                        </button>
+                    </div>
+
+                    <div class="toolbar-card">
+                        <div class="search-box large-search">
+                            <span>⌕</span>
+                            <input id="inventorySearch" type="search" placeholder="Search item or Code…">
+                        </div>
+                        <button class="ghost-button" id="refreshInventoryButton" type="button">↻ Refresh</button>
+                    </div>
+
+                    <section class="panel-card">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Spare Parts</h3>
+                                <span class="muted-text" id="inventoryCount">0 items</span>
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="data-table" id="inventoryTable">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Item Name</th>
+                                        <th>Category</th>
+                                        <th>Quantity Available</th>
+                                        <th>Selling Price</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventoryBody">
+                                    <tr class="empty-row"><td colspan="6">Loading inventory…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- CREATE ORDER -->
+                <section class="view-panel" id="view-create-order" data-view-panel="create-order">
+                    <div class="view-heading">
+                        <div>
+                            <div class="section-kicker">Sales desk</div>
+                            <h2>Take New Order</h2>
+                            <p>Create the order first. Inventory is not deducted until Staff confirms stock and completes.</p>
+                        </div>
+                    </div>
+
+                    <form id="orderForm" class="stack-layout" novalidate>
+                        <section class="panel-card">
+                            <div class="panel-header">
+                                <div>
+                                    <h3>Order Details</h3>
+                                    <span class="muted-text">Customer information</span>
+                                </div>
+                            </div>
+                            <div class="form-grid">
+                                <label class="field-label">
+                                    <span>Party / Customer Name <b>*</b></span>
+                                    <input id="orderCustomerName" type="text" required placeholder="e.g. Sharma Auto Garage">
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="panel-card">
+                            <div class="panel-header">
+                                <div>
+                                    <h3>Order Items</h3><span class="muted-text">Select spare parts to add to this order.</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-grid two-col" style="margin-bottom: 15px;">
+                                <label class="field-label">
+                                    <span>Select Part</span>
+                                    <select id="partSelect" class="filter-select"></select>
+                                </label>
+                                <label class="field-label" style="flex-direction: row; align-items: flex-end; gap: 10px;">
+                                    <div style="flex:1;">
+                                        <span>Req Qty</span>
+                                        <input type="number" id="requestedQty" min="1" value="1">
+                                    </div>
+                                    <button class="secondary-button" id="addOrderLineButton" type="button" style="margin-bottom: 2px;">＋ Add</button>
+                                </label>
+                            </div>
+
+                            <div class="table-wrap">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Item Name</th>
+                                            <th>Unit Price</th>
+                                            <th>Req Qty</th>
+                                            <th>Total Price</th>
+                                            <th style="width: 50px;">Remove</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="orderDraftBody">
+                                        <tr class="empty-row"><td colspan="6">No parts added yet.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div style="margin-top: 14px; border-top: 1px dashed var(--line-strong); padding-top: 15px; display: flex; justify-content: flex-end; align-items: center; gap: 16px; font-size: 13px; color: var(--muted);">
+                                <span>Order Total:</span>
+                                <strong id="orderTotal" style="color: var(--text); font-size: 24px; letter-spacing: -0.03em;">₹0.00</strong>
+                            </div>
+                        </section>
+
+                        <div class="form-actions">
+                            <button class="primary-button" type="submit">Create Order</button>
+                        </div>
+                    </form>
+                </section>
+                {% endif %}
+
+                <!-- STAFF ORDERS -->
+                <section class="view-panel {% if view_mode == 'staff' %}active{% endif %}" id="view-staff-orders" data-view-panel="staff-orders">
+                    <div class="view-heading">
+                        <div>
+                            <div class="section-kicker">Staff workspace</div>
+                            <h2>Orders Queue</h2>
+                            <p>Select a pending order to check physical stock.</p>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-card">
+                        <button class="ghost-button" id="refreshStaffOrdersButton" type="button" style="margin-left: auto;">↻ Refresh</button>
+                    </div>
+
+                    <section class="panel-card">
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Party</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="staffOrdersBody">
+                                    <tr class="empty-row"><td colspan="5">Loading orders…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- STAFF CHECKING -->
+                <section class="view-panel" id="view-staff-checking" data-view-panel="staff-checking">
+                    <div class="view-heading">
+                        <div>
+                            <div class="section-kicker">Fulfilment</div>
+                            <h2>Stock Checking</h2>
+                            <p>Record available quantities without overwriting the requested quantity.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="empty-state" id="staffCheckingEmpty">
+                        <div class="empty-state-icon">✓</div>
+                        <strong>Select an order from the Orders screen</strong>
+                        <button class="secondary-button" data-go-view="staff-orders" type="button" style="margin-top: 15px;">Open Orders</button>
+                    </div>
+                    
+                    <form id="staffCheckingForm" class="hidden">
+                        <section class="panel-card">
+                            <div class="panel-header">
+                                <div>
+                                    <div class="section-kicker">Order review</div>
+                                    <h3 id="staffOrderDetailTitle">Order #—</h3>
+                                    <span class="muted-text" id="staffOrderDetailParty">—</span>
+                                </div>
+                                <span class="status-badge pending" id="staffOrderDetailStatus">Pending</span>
+                            </div>
+                            
+                            <div class="table-wrap">
+                                <table class="data-table stock-check-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Item Name</th>
+                                            <th>Requested</th>
+                                            <th>Available Qty</th>
+                                            <th>Remark</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="staffOrderItemsBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="form-actions" style="margin-top: 20px;" id="staffActionButtons">
+                                <button class="ghost-button" data-go-view="staff-orders" type="button">Back</button>
+                                <button class="primary-button" type="submit">Complete & Deduct Stock</button>
+                            </div>
+                        </section>
+                    </form>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- ADD/EDIT ITEM MODAL -->
+    <div class="modal-backdrop hidden" id="itemModalBackdrop" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="itemModalTitle">
+            <div class="modal-header">
+                <div>
+                    <div class="section-kicker">Inventory</div>
+                    <h3 id="itemModalTitle">Add Item</h3>
+                </div>
+                <button class="icon-button" id="closeItemModalButton" type="button" aria-label="Close">×</button>
+            </div>
+            <form id="itemForm" novalidate>
+                <input type="hidden" id="itemId">
+                <div class="form-grid">
+                    <label class="field-label full-span">
+                        <span>Part Code <b>*</b></span>
+                        <input id="itemPartCode" type="text" required placeholder="e.g. BS-102">
+                    </label>
+                    <label class="field-label full-span">
+                        <span>Item Name <b>*</b></span>
+                        <input id="itemName" type="text" required placeholder="e.g. Brake Shoe">
+                    </label>
+                    <label class="field-label full-span">
+                        <span>Category <b>*</b></span>
+                        <input id="itemCategory" type="text" required placeholder="e.g. Brakes">
+                    </label>
+                    <label class="field-label">
+                        <span>Quantity Available <b>*</b></span>
+                        <input id="itemQuantity" type="number" min="0" step="1" required placeholder="e.g. 25">
+                    </label>
+                    <label class="field-label">
+                        <span>Purchase Price (₹) <b>*</b></span>
+                        <input id="itemPurchase" type="number" min="0" step="0.01" required placeholder="e.g. 150">
+                    </label>
+                    <label class="field-label">
+                        <span>Selling Price (₹) <b>*</b></span>
+                        <input id="itemSelling" type="number" min="0" step="0.01" required placeholder="e.g. 185">
+                    </label>
+                </div>
+                <div class="form-actions modal-actions">
+                    <button class="ghost-button" id="cancelItemButton" type="button">Cancel</button>
+                    <button class="primary-button" type="submit" id="saveItemButton">Save Item</button>
+                </div>
+            </form>
+        </div>
     </div>
     {% endif %}
 
-    <!-- Script linked at the end to ensure DOM is loaded -->
+    <!-- TOASTS -->
+    <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

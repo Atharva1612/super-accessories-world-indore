@@ -1,38 +1,67 @@
-// Global State
+// --- GLOBAL STATE ---
 let inventory = [];
 let orderDraftItems = [];
+let currentStaffOrder = null;
 
-// --- Utilities ---
-function showNotification(msg, type = 'success') {
-    const container = document.getElementById('notification-container');
-    const notif = document.createElement('div');
-    notif.className = `notification ${type}`;
-    notif.innerText = msg;
-    container.appendChild(notif);
-    
-    // Animate in
-    setTimeout(() => notif.classList.add('show'), 10);
-    // Remove after 3 seconds
+// --- MOBILE SIDEBAR TOGGLE ---
+const body = document.body;
+function toggleSidebar() { body.classList.toggle('sidebar-open'); }
+document.getElementById('mobileMenuButton')?.addEventListener('click', toggleSidebar);
+document.getElementById('sidebarOverlay')?.addEventListener('click', toggleSidebar);
+
+// --- UTILITIES & NAVIGATION ---
+function showToast(msg, type = 'success') {
+    const stack = document.getElementById('toastStack');
+    if(!stack) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = msg;
+    stack.appendChild(toast);
     setTimeout(() => {
-        notif.classList.remove('show');
-        setTimeout(() => notif.remove(), 300);
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
 
-function switchTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    event.currentTarget.classList.add('active');
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function switchView(viewId) {
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     
-    if (tabId === 'inventory-tab') fetchInventory();
-    if (tabId === 'orders-tab') fetchAdminOrders();
+    const panel = document.getElementById(`view-${viewId}`);
+    if (panel) panel.classList.add('active');
+    
+    const navBtn = document.querySelector(`.nav-item[data-view="${viewId}"]`);
+    if (navBtn) navBtn.classList.add('active');
+    
+    const pageTitle = document.getElementById('pageTitle');
+    if (viewId === 'admin-dashboard') { pageTitle.innerText = 'Dashboard'; fetchDashboard(); }
+    if (viewId === 'inventory') { pageTitle.innerText = 'Inventory'; fetchInventory(); }
+    if (viewId === 'create-order') { pageTitle.innerText = 'Take Order'; fetchInventoryForDropdown(); }
+    if (viewId === 'staff-orders') { pageTitle.innerText = 'Orders Queue'; fetchStaffOrders(); }
+    if (viewId === 'staff-checking') { pageTitle.innerText = 'Stock Checking'; }
+    
+    // Auto-close sidebar on mobile after clicking a link
+    if (window.innerWidth <= 760) body.classList.remove('sidebar-open');
 }
 
-function openModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+// Global Nav Listeners
+document.querySelectorAll('[data-view]').forEach(btn => {
+    btn.addEventListener('click', (e) => switchView(e.currentTarget.getAttribute('data-view')));
+});
+document.querySelectorAll('[data-go-view]').forEach(btn => {
+    btn.addEventListener('click', (e) => switchView(e.currentTarget.getAttribute('data-go-view')));
+});
 
-// --- ADMIN MODE: INVENTORY ---
+// Set current date in header
+const dateSpan = document.getElementById('topbarDate');
+if (dateSpan) dateSpan.innerText = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+
+// --- 1. ADMIN INVENTORY LOGIC ---
 async function fetchInventory() {
     if (window.APP_MODE !== 'admin') return;
     try {
@@ -40,393 +69,341 @@ async function fetchInventory() {
         inventory = await res.json();
         renderInventory(inventory);
     } catch (e) {
-        showNotification('Error fetching inventory', 'error');
+        showToast('Failed to load inventory', 'error');
     }
 }
 
 function renderInventory(data) {
-    const tbody = document.getElementById('inventory-table-body');
+    const tbody = document.getElementById('inventoryBody');
     if (!tbody) return;
     tbody.innerHTML = '';
+    
+    document.getElementById('inventoryCount').innerText = `${data.length} items`;
+    
+    if(data.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No inventory items found.</td></tr>`;
+        return;
+    }
+
     data.forEach(part => {
+        const stockStyle = part.quantity <= 5 ? 'color: var(--red); font-weight: 800;' : 'font-weight: 700;';
         tbody.innerHTML += `
             <tr>
-                <td>${part.part_code}</td>
+                <td><strong>${part.part_code}</strong></td>
                 <td>${part.name}</td>
                 <td>${part.category}</td>
-                <td>${part.quantity}</td>
-                <td>$${part.selling_price.toFixed(2)}</td>
-                <td>
-                    <button class="btn small secondary" onclick='editPart(${JSON.stringify(part).replace(/'/g, "&apos;")})'>Edit</button>
-                    <button class="btn small danger" onclick='deletePart(${part.id})'>Delete</button>
+                <td style="${stockStyle}">${part.quantity}</td>
+                <td>₹${part.selling_price.toFixed(2)}</td>
+                <td style="display:flex; gap: 8px;">
+                    <button class="ghost-button" style="padding: 5px 10px; min-height:0;" onclick='editItem(${JSON.stringify(part).replace(/'/g, "&apos;")})'>Edit</button>
+                    <button class="ghost-button" style="padding: 5px 10px; min-height:0; color:var(--red); border-color:var(--red-soft);" onclick='deleteItem(${part.id})'>Del</button>
                 </td>
             </tr>
         `;
     });
 }
 
-function filterInventory() {
-    const query = document.getElementById('search-inventory').value.toLowerCase();
-    const filtered = inventory.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.part_code.toLowerCase().includes(query)
-    );
-    renderInventory(filtered);
+const itemModal = 'itemModalBackdrop';
+document.getElementById('openAddItemButton')?.addEventListener('click', () => {
+    document.getElementById('itemForm').reset();
+    document.getElementById('itemId').value = '';
+    document.getElementById('itemModalTitle').innerText = 'Add Item';
+    openModal(itemModal);
+});
+document.getElementById('closeItemModalButton')?.addEventListener('click', () => closeModal(itemModal));
+document.getElementById('cancelItemButton')?.addEventListener('click', () => closeModal(itemModal));
+document.getElementById('refreshInventoryButton')?.addEventListener('click', fetchInventory);
+
+document.getElementById('inventorySearch')?.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    renderInventory(inventory.filter(p => p.name.toLowerCase().includes(q) || p.part_code.toLowerCase().includes(q)));
+});
+
+function editItem(part) {
+    document.getElementById('itemId').value = part.id;
+    document.getElementById('itemPartCode').value = part.part_code;
+    document.getElementById('itemName').value = part.name;
+    document.getElementById('itemCategory').value = part.category;
+    document.getElementById('itemQuantity').value = part.quantity;
+    document.getElementById('itemPurchase').value = part.purchase_price;
+    document.getElementById('itemSelling').value = part.selling_price;
+    document.getElementById('itemModalTitle').innerText = 'Edit Item';
+    openModal(itemModal);
 }
 
-function openPartModal() {
-    document.getElementById('part-form').reset();
-    document.getElementById('part-id').value = '';
-    document.getElementById('part-modal-title').innerText = 'Add Part';
-    openModal('part-modal');
-}
-
-function editPart(part) {
-    document.getElementById('part-id').value = part.id;
-    document.getElementById('part-code').value = part.part_code;
-    document.getElementById('part-name').value = part.name;
-    document.getElementById('part-category').value = part.category;
-    document.getElementById('part-quantity').value = part.quantity;
-    document.getElementById('part-purchase').value = part.purchase_price;
-    document.getElementById('part-selling').value = part.selling_price;
-    document.getElementById('part-modal-title').innerText = 'Edit Part';
-    openModal('part-modal');
-}
-
-async function submitPart(e) {
+document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const id = document.getElementById('part-id').value;
-    const data = {
-        part_code: document.getElementById('part-code').value,
-        name: document.getElementById('part-name').value,
-        category: document.getElementById('part-category').value,
-        quantity: document.getElementById('part-quantity').value,
-        purchase_price: document.getElementById('part-purchase').value,
-        selling_price: document.getElementById('part-selling').value
+    const id = document.getElementById('itemId').value;
+    const payload = {
+        part_code: document.getElementById('itemPartCode').value,
+        name: document.getElementById('itemName').value,
+        category: document.getElementById('itemCategory').value,
+        quantity: document.getElementById('itemQuantity').value,
+        purchase_price: document.getElementById('itemPurchase').value,
+        selling_price: document.getElementById('itemSelling').value
     };
-
-    const method = id ? 'PUT' : 'POST';
-    const url = id ? `/api/parts/${id}` : '/api/parts';
-
+    
     try {
-        const res = await fetch(url, {
-            method: method,
+        const res = await fetch(id ? `/api/parts/${id}` : '/api/parts', {
+            method: id ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         });
-        const result = await res.json();
-        
-        if (result.success) {
-            showNotification('Part saved successfully');
-            closeModal('part-modal');
+        const json = await res.json();
+        if (json.success) {
+            showToast('Item saved successfully!');
+            closeModal(itemModal);
             fetchInventory();
+            fetchDashboard();
         } else {
-            showNotification(result.error || 'Failed to save part', 'error');
+            showToast(json.error || 'Failed to save', 'error');
         }
-    } catch (err) {
-        showNotification('Network error', 'error');
-    }
+    } catch(err) { showToast('Network Error', 'error'); }
+});
+
+async function deleteItem(id) {
+    if (!confirm("Delete this part entirely?")) return;
+    const res = await fetch(`/api/parts/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if(json.success) { showToast('Item deleted.'); fetchInventory(); }
 }
 
-async function deletePart(id) {
-    if (!confirm('Are you sure you want to delete this part?')) return;
-    try {
-        const res = await fetch(`/api/parts/${id}`, { method: 'DELETE' });
-        const result = await res.json();
-        if (result.success) {
-            showNotification('Part deleted');
-            fetchInventory();
-        } else {
-            showNotification(result.error || 'Failed to delete', 'error');
-        }
-    } catch (err) {
-        showNotification('Network error', 'error');
-    }
-}
 
-// --- ADMIN MODE: ORDERS ---
-function openOrderModal() {
-    document.getElementById('order-form').reset();
+// --- 2. ADMIN ORDER CREATION (WITH PRICES) ---
+async function fetchInventoryForDropdown() {
+    if (inventory.length === 0) {
+        const res = await fetch('/api/parts');
+        inventory = await res.json();
+    }
+    const select = document.getElementById('partSelect');
+    if(!select) return;
+    select.innerHTML = '<option value="">-- Choose a part --</option>';
+    inventory.forEach(p => select.innerHTML += `<option value="${p.id}">${p.part_code} - ${p.name} (Stock: ${p.quantity}) - ₹${p.selling_price.toFixed(2)}</option>`);
     orderDraftItems = [];
-    renderOrderDraft();
-    
-    // Populate select
-    const select = document.getElementById('part-select');
-    select.innerHTML = '<option value="">Select a part...</option>';
-    inventory.forEach(p => {
-        select.innerHTML += `<option value="${p.id}">${p.part_code} - ${p.name} (Stock: ${p.quantity})</option>`;
-    });
-    
-    openModal('order-modal');
+    renderDraft();
 }
 
-function addPartToOrder() {
-    const select = document.getElementById('part-select');
-    const partId = select.value;
-    const reqQty = parseInt(document.getElementById('requested-qty-input').value);
+document.getElementById('addOrderLineButton')?.addEventListener('click', () => {
+    const partId = document.getElementById('partSelect').value;
+    const reqQty = parseInt(document.getElementById('requestedQty').value);
     
-    if (!partId || isNaN(reqQty) || reqQty < 1) {
-        showNotification('Select a valid part and quantity > 0', 'error');
-        return;
-    }
+    if(!partId || reqQty < 1) return showToast('Select part and quantity', 'error');
+    if(orderDraftItems.find(i => i.part_id == partId)) return showToast('Part already in list', 'error');
     
     const part = inventory.find(p => p.id == partId);
-    if (orderDraftItems.find(i => i.part_id == partId)) {
-        showNotification('Part already in order list', 'error');
+    orderDraftItems.push({ 
+        part_id: part.id, part_code: part.part_code, name: part.name, 
+        requested_qty: reqQty, selling_price: part.selling_price 
+    });
+    
+    renderDraft();
+});
+
+function removeDraftLine(idx) { orderDraftItems.splice(idx, 1); renderDraft(); }
+
+function renderDraft() {
+    const tbody = document.getElementById('orderDraftBody');
+    const orderTotalEl = document.getElementById('orderTotal');
+    if(!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if(orderDraftItems.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No parts added yet.</td></tr>`;
+        if (orderTotalEl) orderTotalEl.innerText = '₹0.00';
         return;
     }
     
-    orderDraftItems.push({
-        part_id: part.id,
-        part_code: part.part_code,
-        name: part.name,
-        requested_qty: reqQty
-    });
+    let grandTotal = 0;
     
-    document.getElementById('requested-qty-input').value = '';
-    select.value = '';
-    renderOrderDraft();
-}
-
-function removeDraftItem(index) {
-    orderDraftItems.splice(index, 1);
-    renderOrderDraft();
-}
-
-function renderOrderDraft() {
-    const tbody = document.getElementById('order-draft-body');
-    tbody.innerHTML = '';
-    orderDraftItems.forEach((item, index) => {
+    orderDraftItems.forEach((i, idx) => {
+        const lineTotal = i.requested_qty * i.selling_price;
+        grandTotal += lineTotal;
         tbody.innerHTML += `
             <tr>
-                <td>${item.part_code}</td>
-                <td>${item.name}</td>
-                <td>${item.requested_qty}</td>
-                <td><button type="button" class="btn small danger" onclick="removeDraftItem(${index})">X</button></td>
+                <td><strong>${i.part_code}</strong></td>
+                <td>${i.name}</td>
+                <td>₹${i.selling_price.toFixed(2)}</td>
+                <td>${i.requested_qty}</td>
+                <td><strong>₹${lineTotal.toFixed(2)}</strong></td>
+                <td><button type="button" class="ghost-button" style="color:var(--red); padding:5px; min-height:0;" onclick="removeDraftLine(${idx})">X</button></td>
             </tr>
         `;
     });
+    
+    if (orderTotalEl) orderTotalEl.innerText = `₹${grandTotal.toFixed(2)}`;
 }
 
-async function submitOrder(e) {
+document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (orderDraftItems.length === 0) {
-        showNotification('Add at least one item to the order', 'error');
-        return;
-    }
+    if(orderDraftItems.length === 0) return showToast('Add at least one item.', 'error');
     
-    const data = {
-        customer_name: document.getElementById('order-customer').value,
+    const payload = {
+        customer_name: document.getElementById('orderCustomerName').value,
         items: orderDraftItems
     };
     
-    try {
-        const res = await fetch('/api/orders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        
-        if (result.success) {
-            showNotification('Order created successfully');
-            closeModal('order-modal');
-            fetchAdminOrders();
-        } else {
-            showNotification(result.error || 'Failed to create order', 'error');
-        }
-    } catch (err) {
-        showNotification('Network error', 'error');
-    }
-}
+    const res = await fetch('/api/orders', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const json = await res.json();
+    if(json.success) {
+        showToast('Order Created successfully!');
+        document.getElementById('orderForm').reset();
+        orderDraftItems = [];
+        renderDraft(); 
+        switchView('admin-dashboard');
+    } else { showToast(json.error, 'error'); }
+});
 
-async function fetchAdminOrders() {
+
+// --- 3. ADMIN DASHBOARD METRICS ---
+async function fetchDashboard() {
     if (window.APP_MODE !== 'admin') return;
     try {
-        const res = await fetch('/api/orders');
-        const orders = await res.json();
-        renderAdminOrders(orders);
-    } catch (e) {
-        showNotification('Error fetching orders', 'error');
-    }
-}
-
-function renderAdminOrders(orders) {
-    const container = document.getElementById('orders-container');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    if (orders.length === 0) {
-        container.innerHTML = '<p>No orders found.</p>';
-        return;
-    }
-    
-    orders.forEach(order => {
-        let itemsHtml = order.items.map(i => `
-            <tr>
-                <td>${i.part_code}</td>
-                <td>${i.name}</td>
-                <td>${i.requested_qty}</td>
-                <td><strong>${order.status !== 'Pending' ? i.available_qty : '-'}</strong></td>
-                <td>${i.remarks || '-'}</td>
-            </tr>
-        `).join('');
+        const partsRes = await fetch('/api/parts');
+        const parts = await partsRes.json();
+        const ordersRes = await fetch('/api/orders');
+        const orders = await ordersRes.json();
         
-        let actionBtn = '';
-        if (order.status === 'Checked') {
-            actionBtn = `<button class="btn primary small" onclick="markOrderCompleted(${order.id})">Mark as Completed</button>`;
-        }
+        let totalItems = parts.length;
+        let totalStock = parts.reduce((sum, p) => sum + p.quantity, 0);
+        let pending = orders.filter(o => o.status === 'Pending').length;
+        let completed = orders.filter(o => o.status === 'Completed').length;
         
-        container.innerHTML += `
-            <div class="order-card status-${order.status}">
-                <div class="order-header">
-                    <div>
-                        <h3>Order #${order.id} - ${order.customer_name}</h3>
-                        <div class="order-meta">Created: ${new Date(order.created_at).toLocaleString()}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <span class="badge ${order.status}">${order.status}</span>
-                        <div style="margin-top: 10px;">${actionBtn}</div>
-                    </div>
-                </div>
-                <table>
-                    <thead>
-                        <tr><th>Code</th><th>Item Name</th><th>Req Qty</th><th>Avail Qty</th><th>Staff Remarks</th></tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-            </div>
-        `;
-    });
+        document.getElementById('statTotalItems').innerText = totalItems;
+        document.getElementById('statTotalStock').innerText = totalStock;
+        document.getElementById('statPendingOrders').innerText = pending;
+        document.getElementById('statCompletedOrders').innerText = completed;
+        
+        const tbody = document.getElementById('dashboardOrdersBody');
+        tbody.innerHTML = '';
+        if(orders.length === 0) tbody.innerHTML = `<tr class="empty-row"><td colspan="4">No recent orders</td></tr>`;
+        
+        orders.slice(0, 5).forEach(o => {
+            const badgeClass = o.status === 'Pending' ? 'pending' : (o.status === 'Completed' ? 'completed' : 'checked');
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>#${o.id}</strong></td>
+                    <td>${o.customer_name}</td>
+                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                    <td><span class="status-badge ${badgeClass}">${o.status}</span></td>
+                </tr>
+            `;
+        });
+    } catch(e) {}
 }
 
-async function markOrderCompleted(orderId) {
-    if (!confirm('Mark this order as completed? (This implies items were dispatched. Note: Inventory deduction logic is skipped per requirements).')) return;
-    try {
-        const res = await fetch(`/api/orders/${orderId}/complete`, { method: 'POST' });
-        const result = await res.json();
-        if (result.success) {
-            showNotification('Order completed');
-            fetchAdminOrders();
-        } else {
-            showNotification(result.error || 'Failed to complete', 'error');
-        }
-    } catch (err) {
-        showNotification('Network error', 'error');
-    }
-}
 
-// --- STAFF MODE ---
+// --- 4. STAFF WORKFLOW ---
 async function fetchStaffOrders() {
-    if (window.APP_MODE !== 'staff') return;
     try {
-        const res = await fetch(`/api/staff/${window.SHOP_SLUG}/orders`);
+        const endpoint = window.APP_MODE === 'staff' ? `/api/staff/${window.SHOP_SLUG}/orders` : `/api/orders`;
+        const res = await fetch(endpoint);
         const orders = await res.json();
-        renderStaffOrders(orders);
-    } catch (e) {
-        showNotification('Error fetching orders', 'error');
-    }
+        
+        const tbody = document.getElementById('staffOrdersBody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        if(orders.length === 0) {
+            tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No pending orders.</td></tr>`;
+            return;
+        }
+        
+        orders.forEach(o => {
+            const badgeClass = o.status === 'Pending' ? 'pending' : (o.status === 'Completed' ? 'completed' : 'checked');
+            const actionBtn = (o.status === 'Pending' && window.APP_MODE === 'staff') 
+                ? `<button class="primary-button" style="padding: 6px 12px; min-height: 0;" onclick='openStaffOrder(${JSON.stringify(o).replace(/'/g, "&apos;")})'>Check Stock</button>`
+                : `<button class="secondary-button" style="padding: 6px 12px; min-height: 0;" onclick='openStaffOrder(${JSON.stringify(o).replace(/'/g, "&apos;")})'>View</button>`;
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>#${o.id}</strong></td>
+                    <td>${o.customer_name}</td>
+                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                    <td><span class="status-badge ${badgeClass}">${o.status}</span></td>
+                    <td>${actionBtn}</td>
+                </tr>
+            `;
+        });
+    } catch(e) {}
 }
 
-function renderStaffOrders(orders) {
-    const container = document.getElementById('staff-orders-container');
-    container.innerHTML = '';
+document.getElementById('refreshStaffOrdersButton')?.addEventListener('click', fetchStaffOrders);
+
+function openStaffOrder(order) {
+    currentStaffOrder = order;
+    switchView('staff-checking');
     
-    if (orders.length === 0) {
-        container.innerHTML = '<p>No orders found for this shop.</p>';
-        return;
-    }
+    document.getElementById('staffCheckingEmpty').classList.add('hidden');
+    document.getElementById('staffCheckingForm').classList.remove('hidden');
     
-    orders.forEach(order => {
-        let isPending = order.status === 'Pending';
-        let itemsHtml = order.items.map(i => {
-            if (isPending) {
-                // Input mode
-                return `
-                    <tr data-item-id="${i.id}">
-                        <td>${i.part_code}</td>
-                        <td>${i.name}</td>
-                        <td><strong>${i.requested_qty}</strong></td>
-                        <td><input type="number" class="staff-input avail-qty" min="0" value="${i.requested_qty}" required></td>
-                        <td><input type="text" class="staff-remarks item-remarks" placeholder="Optional remarks"></td>
-                    </tr>
-                `;
-            } else {
-                // Read-only mode
-                return `
-                    <tr>
-                        <td>${i.part_code}</td>
-                        <td>${i.name}</td>
-                        <td>${i.requested_qty}</td>
-                        <td><strong>${i.available_qty}</strong></td>
-                        <td>${i.remarks || '-'}</td>
-                    </tr>
-                `;
-            }
-        }).join('');
-        
-        let formWrapperStart = isPending ? `<form onsubmit="submitStaffUpdate(event, ${order.id})">` : '';
-        let formWrapperEnd = isPending ? `<div style="margin-top: 1rem; text-align:right;"><button type="submit" class="btn primary">Submit Availability Check</button></div></form>` : '';
-        
-        container.innerHTML += `
-            <div class="order-card status-${order.status}" id="order-card-${order.id}">
-                <div class="order-header">
-                    <div>
-                        <h3>Order #${order.id} - ${order.customer_name}</h3>
-                        <div class="order-meta">Created: ${new Date(order.created_at).toLocaleString()}</div>
-                    </div>
-                    <span class="badge ${order.status}">${order.status}</span>
-                </div>
-                ${formWrapperStart}
-                <table>
-                    <thead>
-                        <tr><th>Code</th><th>Item Name</th><th>Req Qty</th><th>Avail Qty</th><th>Remarks</th></tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-                ${formWrapperEnd}
-            </div>
-        `;
+    document.getElementById('staffOrderDetailTitle').innerText = `Order #${order.id}`;
+    document.getElementById('staffOrderDetailParty').innerText = order.customer_name;
+    
+    const badge = document.getElementById('staffOrderDetailStatus');
+    badge.className = `status-badge ${order.status === 'Pending' ? 'pending' : 'completed'}`;
+    badge.innerText = order.status;
+    
+    const isPending = order.status === 'Pending' && window.APP_MODE === 'staff';
+    document.getElementById('staffActionButtons').style.display = isPending ? 'flex' : 'none';
+    
+    const tbody = document.getElementById('staffOrderItemsBody');
+    tbody.innerHTML = '';
+    
+    order.items.forEach(i => {
+        if(isPending) {
+            tbody.innerHTML += `
+                <tr data-item-id="${i.id}">
+                    <td><strong>${i.part_code}</strong></td>
+                    <td>${i.name}</td>
+                    <td>${i.requested_qty}</td>
+                    <td><input type="number" class="available-quantity-input field-label input" style="height:36px; min-width: 60px; max-width:80px;" min="0" value="${i.requested_qty}" required></td>
+                    <td><input type="text" class="item-remark field-label input" style="height:36px; width: 100%; min-width:100px;" placeholder="Remarks"></td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${i.part_code}</strong></td>
+                    <td>${i.name}</td>
+                    <td>${i.requested_qty}</td>
+                    <td><strong>${i.available_qty}</strong></td>
+                    <td>${i.remarks || '-'}</td>
+                </tr>
+            `;
+        }
     });
 }
 
-async function submitStaffUpdate(e, orderId) {
+document.getElementById('staffCheckingForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const card = document.getElementById(`order-card-${orderId}`);
-    const rows = card.querySelectorAll('tbody tr');
+    if (!currentStaffOrder) return;
+    if (!confirm('Complete order and permanently deduct these quantities from master inventory?')) return;
     
-    const updates = Array.from(rows).map(row => {
-        return {
-            item_id: row.getAttribute('data-item-id'),
-            available_qty: row.querySelector('.avail-qty').value,
-            remarks: row.querySelector('.item-remarks').value
-        };
-    });
+    const rows = document.querySelectorAll('#staffOrderItemsBody tr');
+    const updates = Array.from(rows).map(r => ({
+        item_id: r.getAttribute('data-item-id'),
+        available_qty: r.querySelector('.available-quantity-input').value,
+        remarks: r.querySelector('.item-remark').value
+    }));
     
     try {
         const res = await fetch(`/api/staff/${window.SHOP_SLUG}/orders`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: orderId, items: updates })
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ order_id: currentStaffOrder.id, items: updates })
         });
-        const result = await res.json();
-        
-        if (result.success) {
-            showNotification('Order successfully checked and updated');
-            fetchStaffOrders();
+        const json = await res.json();
+        if(json.success) {
+            showToast('Order completed & stock deducted successfully!');
+            switchView('staff-orders');
         } else {
-            showNotification(result.error || 'Failed to update order', 'error');
+            showToast(json.error, 'error');
         }
-    } catch (err) {
-        showNotification('Network error', 'error');
-    }
-}
+    } catch(err) { showToast('Network error', 'error'); }
+});
 
-// --- Initialization ---
+// Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.APP_MODE === 'admin') {
-        fetchInventory();
-    } else if (window.APP_MODE === 'staff') {
-        fetchStaffOrders();
-    }
+    if(window.APP_MODE === 'admin') fetchDashboard();
+    else if(window.APP_MODE === 'staff') switchView('staff-orders');
 });
