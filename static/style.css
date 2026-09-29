@@ -859,7 +859,91 @@ body.staff-mode .brand-mark {
     background: linear-gradient(135deg, #16a34a, #15803d);
 }
 
-/* RESPONSIVE MEDIA QUERIES (MOBILE / TABLET OPTIMIZATIONS) */
+/* =========================================================
+   SEARCHABLE ITEM DROPDOWN
+========================================================= */
+.searchable-item {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-item-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+}
+
+.searchable-item-input:focus {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+}
+
+.searchable-item-menu {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    display: none;
+}
+
+.searchable-item.open .searchable-item-menu {
+    display: block;
+}
+
+.searchable-item-option {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    border-bottom: 1px solid var(--line);
+}
+
+.searchable-item-option:last-child {
+    border-bottom: 0;
+}
+
+.searchable-item-option:hover {
+    background: var(--brand-soft);
+}
+
+.searchable-item-option strong {
+    display: block;
+    font-size: 13px;
+}
+
+.searchable-item-option small {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.searchable-item-empty {
+    padding: 14px 12px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+
+/* RESPONSIVE MEDIA QUERIES */
 @media (max-width: 1024px) {
     .stats-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -942,7 +1026,6 @@ body.staff-mode .brand-mark {
         padding: 15px;
     }
 
-    /* Ensuring inputs in tables on mobile are sized nicely */
     .field-label.input {
         width: 100% !important;
         min-width: 60px;

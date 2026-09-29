@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,6 +8,7 @@
     <title>MotoStock • {{ shop_name if shop_name else 'Management' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body class="{% if view_mode == 'staff' %}staff-mode{% endif %}">
 
     {% if view_mode == 'login' %}
@@ -20,9 +22,10 @@
                 </div>
             </div>
             <h2 style="text-align: center; margin-bottom: 20px; font-size: 20px;">Admin Login</h2>
-            
+
             {% if error %}
-            <div style="background: var(--red-soft); color: var(--red); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: center; border: 1px solid #fecaca;">
+            <div
+                style="background: var(--red-soft); color: var(--red); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: center; border: 1px solid #fecaca;">
                 {{ error }}
             </div>
             {% endif %}
@@ -36,7 +39,8 @@
                     <span>Password</span>
                     <input type="password" name="password" required>
                 </label>
-                <button type="submit" class="primary-button" style="width: 100%; margin-top: 10px;">Login to Workspace</button>
+                <button type="submit" class="primary-button" style="width: 100%; margin-top: 10px;">Login to
+                    Workspace</button>
             </form>
         </div>
     </div>
@@ -47,9 +51,8 @@
         window.SHOP_SLUG = '{{ shop_slug if shop_slug else "" }}';
         window.SHOP_NAME = '{{ shop_name }}';
     </script>
-    
+
     <div class="app-shell">
-        <!-- Overlay for mobile sidebar -->
         <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
         <aside class="sidebar" id="sidebar">
@@ -79,7 +82,8 @@
                 {% endif %}
 
                 <div class="nav-section-title staff-only-nav">Staff Dashboard</div>
-                <button class="nav-item staff-only-nav {% if view_mode == 'staff' %}active{% endif %}" data-view="staff-orders" type="button">
+                <button class="nav-item staff-only-nav {% if view_mode == 'staff' %}active{% endif %}"
+                    data-view="staff-orders" type="button">
                     <span class="nav-icon">☷</span>
                     <span>Orders</span>
                 </button>
@@ -95,7 +99,9 @@
                     <span>System Online</span>
                 </div>
                 {% if view_mode == 'admin' %}
-                <a href="{{ url_for('logout') }}" style="display:block; margin-top:15px; color: #9ca9bb; text-decoration: none; font-size: 13px; font-weight: 600;">← Logout</a>
+                <a href="{{ url_for('logout') }}"
+                    style="display:block; margin-top:15px; color: #9ca9bb; text-decoration: none; font-size: 13px; font-weight: 600;">←
+                    Logout</a>
                 {% endif %}
             </div>
         </aside>
@@ -103,7 +109,8 @@
         <div class="main-panel">
             <header class="topbar">
                 <div class="topbar-left">
-                    <button class="icon-button mobile-menu" id="mobileMenuButton" type="button" aria-label="Open menu">☰</button>
+                    <button class="icon-button mobile-menu" id="mobileMenuButton" type="button"
+                        aria-label="Open menu">☰</button>
                     <div>
                         <div class="eyebrow" id="pageEyebrow">{{ view_mode | upper }} WORKSPACE</div>
                         <h1 id="pageTitle">{{ 'Dashboard' if view_mode == 'admin' else 'Orders Queue' }}</h1>
@@ -180,7 +187,9 @@
                                         </tr>
                                     </thead>
                                     <tbody id="dashboardOrdersBody">
-                                        <tr class="empty-row"><td colspan="4">Loading orders…</td></tr>
+                                        <tr class="empty-row">
+                                            <td colspan="4">Loading orders…</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -196,7 +205,8 @@
                             <div class="quick-actions">
                                 <button class="quick-action" data-go-view="inventory" type="button">
                                     <span class="quick-icon">◫</span>
-                                    <span><strong>Manage Inventory</strong><small>Add, edit or review parts</small></span>
+                                    <span><strong>Manage Inventory</strong><small>Add, edit or review
+                                            parts</small></span>
                                     <span class="quick-arrow">→</span>
                                 </button>
                                 <button class="quick-action" data-go-view="create-order" type="button">
@@ -250,7 +260,9 @@
                                     </tr>
                                 </thead>
                                 <tbody id="inventoryBody">
-                                    <tr class="empty-row"><td colspan="6">Loading inventory…</td></tr>
+                                    <tr class="empty-row">
+                                        <td colspan="6">Loading inventory…</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -263,7 +275,8 @@
                         <div>
                             <div class="section-kicker">Sales desk</div>
                             <h2>Take New Order</h2>
-                            <p>Create the order first. Inventory is not deducted until Staff confirms stock and completes.</p>
+                            <p>Create the order first. Inventory is not deducted until Staff confirms stock and
+                                completes.</p>
                         </div>
                     </div>
 
@@ -278,7 +291,8 @@
                             <div class="form-grid">
                                 <label class="field-label">
                                     <span>Party / Customer Name <b>*</b></span>
-                                    <input id="orderCustomerName" type="text" required placeholder="e.g. Sharma Auto Garage">
+                                    <input id="orderCustomerName" type="text" required
+                                        placeholder="e.g. Sharma Auto Garage">
                                 </label>
                             </div>
                         </section>
@@ -286,21 +300,33 @@
                         <section class="panel-card">
                             <div class="panel-header">
                                 <div>
-                                    <h3>Order Items</h3><span class="muted-text">Select spare parts to add to this order.</span>
+                                    <h3>Order Items</h3><span class="muted-text">Search and select spare parts to add to
+                                        this order.</span>
                                 </div>
                             </div>
-                            
+
                             <div class="form-grid two-col" style="margin-bottom: 15px;">
-                                <label class="field-label">
-                                    <span>Select Part</span>
-                                    <select id="partSelect" class="filter-select"></select>
+                                <!-- CUSTOM SEARCHABLE DROPDOWN -->
+                                <label class="field-label" style="position: relative; z-index: 10;">
+                                    <span>Search & Select Part</span>
+                                    <div class="searchable-item" id="partSearchContainer">
+                                        <input type="text" id="partSearchInput" class="searchable-item-input"
+                                            placeholder="Search by name or code..." autocomplete="off">
+                                        <input type="hidden" id="selectedPartId">
+                                        <div class="searchable-item-menu" id="partSearchMenu">
+                                            <!-- Populated by JS -->
+                                        </div>
+                                    </div>
                                 </label>
-                                <label class="field-label" style="flex-direction: row; align-items: flex-end; gap: 10px;">
+
+                                <label class="field-label"
+                                    style="flex-direction: row; align-items: flex-end; gap: 10px;">
                                     <div style="flex:1;">
                                         <span>Req Qty</span>
                                         <input type="number" id="requestedQty" min="1" value="1">
                                     </div>
-                                    <button class="secondary-button" id="addOrderLineButton" type="button" style="margin-bottom: 2px;">＋ Add</button>
+                                    <button class="secondary-button" id="addOrderLineButton" type="button"
+                                        style="margin-bottom: 2px;">＋ Add</button>
                                 </label>
                             </div>
 
@@ -317,14 +343,18 @@
                                         </tr>
                                     </thead>
                                     <tbody id="orderDraftBody">
-                                        <tr class="empty-row"><td colspan="6">No parts added yet.</td></tr>
+                                        <tr class="empty-row">
+                                            <td colspan="6">No parts added yet.</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
-                            
-                            <div style="margin-top: 14px; border-top: 1px dashed var(--line-strong); padding-top: 15px; display: flex; justify-content: flex-end; align-items: center; gap: 16px; font-size: 13px; color: var(--muted);">
+
+                            <div
+                                style="margin-top: 14px; border-top: 1px dashed var(--line-strong); padding-top: 15px; display: flex; justify-content: flex-end; align-items: center; gap: 16px; font-size: 13px; color: var(--muted);">
                                 <span>Order Total:</span>
-                                <strong id="orderTotal" style="color: var(--text); font-size: 24px; letter-spacing: -0.03em;">₹0.00</strong>
+                                <strong id="orderTotal"
+                                    style="color: var(--text); font-size: 24px; letter-spacing: -0.03em;">₹0.00</strong>
                             </div>
                         </section>
 
@@ -336,7 +366,8 @@
                 {% endif %}
 
                 <!-- STAFF ORDERS -->
-                <section class="view-panel {% if view_mode == 'staff' %}active{% endif %}" id="view-staff-orders" data-view-panel="staff-orders">
+                <section class="view-panel {% if view_mode == 'staff' %}active{% endif %}" id="view-staff-orders"
+                    data-view-panel="staff-orders">
                     <div class="view-heading">
                         <div>
                             <div class="section-kicker">Staff workspace</div>
@@ -346,7 +377,8 @@
                     </div>
 
                     <div class="toolbar-card">
-                        <button class="ghost-button" id="refreshStaffOrdersButton" type="button" style="margin-left: auto;">↻ Refresh</button>
+                        <button class="ghost-button" id="refreshStaffOrdersButton" type="button"
+                            style="margin-left: auto;">↻ Refresh</button>
                     </div>
 
                     <section class="panel-card">
@@ -362,7 +394,9 @@
                                     </tr>
                                 </thead>
                                 <tbody id="staffOrdersBody">
-                                    <tr class="empty-row"><td colspan="5">Loading orders…</td></tr>
+                                    <tr class="empty-row">
+                                        <td colspan="5">Loading orders…</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -378,13 +412,14 @@
                             <p>Record available quantities without overwriting the requested quantity.</p>
                         </div>
                     </div>
-                    
+
                     <div class="empty-state" id="staffCheckingEmpty">
                         <div class="empty-state-icon">✓</div>
                         <strong>Select an order from the Orders screen</strong>
-                        <button class="secondary-button" data-go-view="staff-orders" type="button" style="margin-top: 15px;">Open Orders</button>
+                        <button class="secondary-button" data-go-view="staff-orders" type="button"
+                            style="margin-top: 15px;">Open Orders</button>
                     </div>
-                    
+
                     <form id="staffCheckingForm" class="hidden">
                         <section class="panel-card">
                             <div class="panel-header">
@@ -395,7 +430,7 @@
                                 </div>
                                 <span class="status-badge pending" id="staffOrderDetailStatus">Pending</span>
                             </div>
-                            
+
                             <div class="table-wrap">
                                 <table class="data-table stock-check-table">
                                     <thead>
@@ -473,4 +508,5 @@
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
+
 </html>
