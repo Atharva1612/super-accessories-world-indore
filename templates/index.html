@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Two-Wheeler Spare Parts Shop Stock and Order Management System">
-    <title>MotoStock • {{ shop_name if shop_name else 'Management' }}</title>
+    <title>SAW • {{ shop_name if shop_name else 'Management' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
@@ -15,10 +15,10 @@
     <div class="login-wrapper">
         <div class="panel-card login-card">
             <div class="brand-block" style="justify-content: center; margin-bottom: 20px; padding:0;">
-                <div class="brand-mark">M</div>
+                <div class="brand-mark">S</div>
                 <div>
-                    <div class="brand-name" style="color: var(--text);">MotoStock</div>
-                    <div class="brand-subtitle">Spare Parts Manager</div>
+                    <div class="brand-name" style="color: var(--text);">Super Acessories World</div>
+                    <div class="brand-subtitle">Super Acessories World</div>
                 </div>
             </div>
             <h2 style="text-align: center; margin-bottom: 20px; font-size: 20px;">Admin Login</h2>
@@ -57,9 +57,9 @@
 
         <aside class="sidebar" id="sidebar">
             <div class="brand-block">
-                <div class="brand-mark">M</div>
+                <div class="brand-mark">S</div>
                 <div>
-                    <div class="brand-name">MotoStock</div>
+                    <div class="brand-name">SAW</div>
                     <div class="brand-subtitle">{{ shop_name }}</div>
                 </div>
             </div>
@@ -70,6 +70,10 @@
                 <button class="nav-item active" data-view="admin-dashboard" type="button">
                     <span class="nav-icon">▦</span>
                     <span>Dashboard</span>
+                </button>
+                <button class="nav-item" data-view="parties" type="button">
+                    <span class="nav-icon">👤</span>
+                    <span>Parties</span>
                 </button>
                 <button class="nav-item" data-view="inventory" type="button">
                     <span class="nav-icon">◫</span>
@@ -251,7 +255,6 @@
                             <table class="data-table" id="inventoryTable">
                                 <thead>
                                     <tr>
-                                        <th>Code</th>
                                         <th>Item Name</th>
                                         <th>Quantity Available</th>
                                         <th>Price</th>
@@ -267,7 +270,52 @@
                         </div>
                     </section>
                 </section>
+                <!-- PARTIES -->
+                <section class="view-panel" id="view-parties" data-view-panel="parties">
+                    <div class="view-heading">
+                        <div>
+                            <div class="section-kicker">Directory</div>
+                            <h2>Party Management</h2>
+                            <p>Manage customer and party details.</p>
+                        </div>
+                        <button class="primary-button" id="openAddPartyButton" type="button">
+                            <span>＋</span> Add Party
+                        </button>
+                    </div>
 
+                    <div class="toolbar-card">
+                        <div class="search-box large-search">
+                            <span>⌕</span>
+                            <input id="partySearch" type="search" placeholder="Search party by name or phone…">
+                        </div>
+                        <button class="ghost-button" id="refreshPartiesButton" type="button">↻ Refresh</button>
+                    </div>
+
+                    <section class="panel-card">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Parties</h3>
+                                <span class="muted-text" id="partyCount">0 parties</span>
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="data-table" id="partyTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="partyBody">
+                                    <tr class="empty-row">
+                                        <td colspan="3">Loading parties…</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </section>
                 <!-- CREATE ORDER -->
                 <section class="view-panel" id="view-create-order" data-view-panel="create-order">
                     <div class="view-heading">
@@ -288,10 +336,16 @@
                                 </div>
                             </div>
                             <div class="form-grid">
-                                <label class="field-label">
-                                    <span>Party / Customer Name <b>*</b></span>
-                                    <input id="orderCustomerName" type="text" required
-                                        placeholder="e.g. Sharma Auto Garage">
+                                <label class="field-label" style="position: relative; z-index: 11;">
+                                    <span>Search & Select Party <b>*</b></span>
+                                    <div class="searchable-item" id="partySearchContainer">
+                                        <input type="text" id="partySearchInput" class="searchable-item-input"
+                                            placeholder="Search by name..." autocomplete="off" required>
+                                        <input type="hidden" id="selectedPartyName">
+                                        <div class="searchable-item-menu" id="partySearchMenu">
+                                            <!-- Populated by JS -->
+                                        </div>
+                                    </div>
                                 </label>
                             </div>
                         </section>
@@ -434,11 +488,9 @@
                                 <table class="data-table stock-check-table">
                                     <thead>
                                         <tr>
-                                            <th>Code</th>
                                             <th>Item Name</th>
                                             <th>Requested</th>
                                             <th>Available Qty</th>
-                                            <th>Remark</th>
                                         </tr>
                                     </thead>
                                     <tbody id="staffOrderItemsBody"></tbody>
@@ -493,6 +545,35 @@
                 <div class="form-actions modal-actions">
                     <button class="ghost-button" id="cancelItemButton" type="button">Cancel</button>
                     <button class="primary-button" type="submit" id="saveItemButton">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- ADD/EDIT PARTY MODAL -->
+    <div class="modal-backdrop hidden" id="partyModalBackdrop" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="partyModalTitle">
+            <div class="modal-header">
+                <div>
+                    <div class="section-kicker">Directory</div>
+                    <h3 id="partyModalTitle">Add Party</h3>
+                </div>
+                <button class="icon-button" id="closePartyModalButton" type="button" aria-label="Close">×</button>
+            </div>
+            <form id="partyForm" novalidate>
+                <input type="hidden" id="partyId">
+                <div class="form-grid">
+                    <label class="field-label full-span">
+                        <span>Party Name <b>*</b></span>
+                        <input id="partyName" type="text" required placeholder="e.g. Sharma Auto Garage">
+                    </label>
+                    <label class="field-label full-span">
+                        <span>Phone Number</span>
+                        <input id="partyPhone" type="text" placeholder="e.g. 9876543210">
+                    </label>
+                </div>
+                <div class="form-actions modal-actions">
+                    <button class="ghost-button" id="cancelPartyButton" type="button">Cancel</button>
+                    <button class="primary-button" type="submit" id="savePartyButton">Save Party</button>
                 </div>
             </form>
         </div>

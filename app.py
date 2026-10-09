@@ -35,7 +35,6 @@ def init_db():
             FOREIGN KEY (shop_id) REFERENCES shops (id)
         )''')
         
-        # SCHEMA UPDATED: Removed category, combined purchase/selling price into 'price'
         cursor.execute('''CREATE TABLE IF NOT EXISTS parts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             shop_id INTEGER NOT NULL,
@@ -45,6 +44,14 @@ def init_db():
             price REAL NOT NULL CHECK (price >= 0),
             FOREIGN KEY (shop_id) REFERENCES shops (id),
             UNIQUE(shop_id, part_code)
+        )''')
+        
+        cursor.execute('''CREATE TABLE IF NOT EXISTS parties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            phone TEXT,
+            FOREIGN KEY (shop_id) REFERENCES shops (id)
         )''')
         
         cursor.execute('''CREATE TABLE IF NOT EXISTS orders (
@@ -209,6 +216,46 @@ def api_part_detail(part_id):
         db.execute("DELETE FROM parts WHERE id = ? AND shop_id = ?", (part_id, shop_id))
         db.commit()
         db.close()
+        return jsonify({'success': True})
+
+@app.route('/api/parties', methods=['GET', 'POST'])
+@login_required
+def api_parties():
+    db = get_db()
+    shop_id = session['shop_id']
+    if request.method == 'GET':
+        parties = db.execute("SELECT * FROM parties WHERE shop_id = ?", (shop_id,)).fetchall()
+        db.close()
+        return jsonify([dict(p) for p in parties])
+        
+    if request.method == 'POST':
+        data = request.json
+        db.execute('INSERT INTO parties (shop_id, name, phone) VALUES (?, ?, ?)',
+                   (shop_id, data['name'], data.get('phone', '')))
+        db.commit()
+        db.close()
+        return jsonify({'success': True})
+
+@app.route('/api/parties/<int:party_id>', methods=['PUT', 'DELETE'])
+@login_required
+def api_party_detail(party_id):
+    db = get_db()
+    shop_id = session['shop_id']
+    party = db.execute("SELECT id FROM parties WHERE id = ? AND shop_id = ?", (party_id, shop_id)).fetchone()
+    if not party:
+        db.close()
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    if request.method == 'PUT':
+        data = request.json
+        db.execute('UPDATE parties SET name=?, phone=? WHERE id=? AND shop_id=?',
+                   (data['name'], data.get('phone', ''), party_id, shop_id))
+        db.commit()
+        return jsonify({'success': True})
+        
+    if request.method == 'DELETE':
+        db.execute("DELETE FROM parties WHERE id=? AND shop_id=?", (party_id, shop_id))
+        db.commit()
         return jsonify({'success': True})
 
 @app.route('/api/orders', methods=['GET', 'POST'])

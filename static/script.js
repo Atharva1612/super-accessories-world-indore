@@ -3,6 +3,7 @@ let inventory = [];
 let orderDraftItems = [];
 let currentStaffOrder = null;
 let staffOrdersList = []; // Added to store and filter staff orders
+let parties = [];
 
 // --- MOBILE SIDEBAR TOGGLE ---
 const body = document.body;
@@ -46,6 +47,9 @@ function switchView(viewId) {
     if (viewId === 'staff-checking') { pageTitle.innerText = 'Stock Checking'; }
 
     if (window.innerWidth <= 760) body.classList.remove('sidebar-open');
+    if (viewId === 'parties') { pageTitle.innerText = 'Parties'; fetchParties(); }
+    // Update the existing 'create-order' line to also fetch parties:
+    if (viewId === 'create-order') { pageTitle.innerText = 'Take Order'; fetchInventoryForDropdown(); fetchPartiesForDropdown(); }
 }
 
 document.querySelectorAll('[data-view]').forEach(btn => {
@@ -84,8 +88,7 @@ function renderInventory(data) {
         const stockStyle = part.quantity <= 5 ? 'color: var(--red); font-weight: 800;' : 'font-weight: 700;';
         tbody.innerHTML += `
             <tr>
-                <td><strong>${part.part_code}</strong></td>
-                <td>${part.name}</td>
+                <td><strong>${part.name}</strong></td>
                 <td style="${stockStyle}">${part.quantity}</td>
                 <td>₹${part.price.toFixed(2)}</td>
                 <td style="display:flex; gap: 8px;">
@@ -162,6 +165,91 @@ async function deleteItem(id) {
 }
 
 
+// --- PARTY MANAGEMENT LOGIC ---
+async function fetchParties() {
+    if (window.APP_MODE !== 'admin') return;
+    try {
+        const res = await fetch('/api/parties');
+        parties = await res.json();
+        renderParties(parties);
+    } catch (e) { showToast('Failed to load parties', 'error'); }
+}
+
+function renderParties(data) {
+    const tbody = document.getElementById('partyBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    document.getElementById('partyCount').innerText = `${data.length} parties`;
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="3">No parties found.</td></tr>`;
+        return;
+    }
+    data.forEach(p => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${p.name}</strong></td>
+                <td>${p.phone || '-'}</td>
+                <td style="display:flex; gap: 8px;">
+                    <button class="ghost-button" style="padding: 5px 10px; min-height:0;" onclick='editParty(${JSON.stringify(p).replace(/'/g, "&apos;")})'>Edit</button>
+                    <button class="ghost-button" style="padding: 5px 10px; min-height:0; color:var(--red); border-color:var(--red-soft);" onclick='deleteParty(${p.id})'>Del</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+const partyModal = 'partyModalBackdrop';
+document.getElementById('openAddPartyButton')?.addEventListener('click', () => {
+    document.getElementById('partyForm').reset();
+    document.getElementById('partyId').value = '';
+    document.getElementById('partyModalTitle').innerText = 'Add Party';
+    openModal(partyModal);
+});
+document.getElementById('closePartyModalButton')?.addEventListener('click', () => closeModal(partyModal));
+document.getElementById('cancelPartyButton')?.addEventListener('click', () => closeModal(partyModal));
+document.getElementById('refreshPartiesButton')?.addEventListener('click', fetchParties);
+
+document.getElementById('partySearch')?.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    renderParties(parties.filter(p => p.name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q))));
+});
+
+function editParty(party) {
+    document.getElementById('partyId').value = party.id;
+    document.getElementById('partyName').value = party.name;
+    document.getElementById('partyPhone').value = party.phone || '';
+    document.getElementById('partyModalTitle').innerText = 'Edit Party';
+    openModal(partyModal);
+}
+
+document.getElementById('partyForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('partyId').value;
+    const payload = {
+        name: document.getElementById('partyName').value,
+        phone: document.getElementById('partyPhone').value
+    };
+    try {
+        const res = await fetch(id ? `/api/parties/${id}` : '/api/parties', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.success) {
+            showToast('Party saved successfully!');
+            closeModal(partyModal);
+            fetchParties();
+        } else { showToast(json.error || 'Failed to save', 'error'); }
+    } catch (err) { showToast('Network Error', 'error'); }
+});
+
+async function deleteParty(id) {
+    if (!confirm("Delete this party?")) return;
+    const res = await fetch(`/api/parties/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) { showToast('Party deleted.'); fetchParties(); }
+}
 // --- 2. ADMIN ORDER CREATION (SEARCHABLE DROPDOWN) ---
 async function fetchInventoryForDropdown() {
     if (inventory.length === 0) {
@@ -299,16 +387,76 @@ function renderDraft() {
 
     if (orderTotalEl) orderTotalEl.innerText = `₹${grandTotal.toFixed(2)}`;
 }
+async function fetchPartiesForDropdown() {
+    if (parties.length === 0) {
+        const res = await fetch('/api/parties');
+        parties = await res.json();
+    }
+    document.getElementById('partySearchInput').value = '';
+    document.getElementById('selectedPartyName').value = '';
+}
 
+function renderPartySearchMenu(items) {
+    const menu = document.getElementById('partySearchMenu');
+    if (!menu) return;
+    menu.innerHTML = '';
+    if (items.length === 0) {
+        menu.innerHTML = '<div class="searchable-item-empty">No parties found</div>';
+        return;
+    }
+    items.forEach(p => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'searchable-item-option';
+        btn.innerHTML = `<strong>${p.name}</strong><small>${p.phone || 'No phone'}</small>`;
+        btn.onclick = () => {
+            document.getElementById('partySearchInput').value = p.name;
+            document.getElementById('selectedPartyName').value = p.name;
+            document.getElementById('partySearchContainer').classList.remove('open');
+        };
+        menu.appendChild(btn);
+    });
+}
+
+const partySearchInput = document.getElementById('partySearchInput');
+const partySearchContainer = document.getElementById('partySearchContainer');
+
+if (partySearchInput && partySearchContainer) {
+    partySearchInput.addEventListener('focus', () => {
+        partySearchContainer.classList.add('open');
+        renderPartySearchMenu(parties);
+    });
+
+    partySearchInput.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.getElementById('selectedPartyName').value = '';
+        // Allow user to use a party name that is not in the database
+        const filtered = parties.filter(p => p.name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)));
+        renderPartySearchMenu(filtered);
+        partySearchContainer.classList.add('open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!partySearchContainer.contains(e.target)) {
+            partySearchContainer.classList.remove('open');
+        }
+    });
+}
 document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (orderDraftItems.length === 0) return showToast('Add at least one item.', 'error');
 
+    // const payload = {
+    //     customer_name: document.getElementById('orderCustomerName').value,
+    //     items: orderDraftItems
+    // };
+    const customerName = document.getElementById('selectedPartyName').value || document.getElementById('partySearchInput').value;
+    if (!customerName.trim()) return showToast('Please select or enter a party name', 'error');
+
     const payload = {
-        customer_name: document.getElementById('orderCustomerName').value,
+        customer_name: customerName,
         items: orderDraftItems
     };
-
     const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const json = await res.json();
     if (json.success) {
@@ -429,21 +577,17 @@ function openStaffOrder(order) {
         if (isPending) {
             tbody.innerHTML += `
                 <tr data-item-id="${i.id}">
-                    <td><strong>${i.part_code}</strong></td>
-                    <td>${i.name}</td>
+                    <td><strong>${i.name}</strong></td>
                     <td>${i.requested_qty}</td>
                     <td><input type="number" class="available-quantity-input field-label input" style="height:36px; min-width: 60px; max-width:80px;" min="0" value="${i.requested_qty}" required></td>
-                    <td><input type="text" class="item-remark field-label input" style="height:36px; width: 100%; min-width:100px;" placeholder="Remarks"></td>
                 </tr>
             `;
         } else {
             tbody.innerHTML += `
                 <tr>
-                    <td><strong>${i.part_code}</strong></td>
-                    <td>${i.name}</td>
+                    <td><strong>${i.name}</strong></td>
                     <td>${i.requested_qty}</td>
                     <td><strong>${i.available_qty}</strong></td>
-                    <td>${i.remarks || '-'}</td>
                 </tr>
             `;
         }
@@ -458,7 +602,7 @@ document.getElementById('staffCheckingForm')?.addEventListener('submit', async (
     const updates = Array.from(rows).map(r => ({
         item_id: r.getAttribute('data-item-id'),
         available_qty: r.querySelector('.available-quantity-input').value,
-        remarks: r.querySelector('.item-remark').value
+        remarks: ''
     }));
 
     try {

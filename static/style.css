@@ -1035,4 +1035,79 @@ body.staff-mode .brand-mark {
         width: 100% !important;
         min-width: 60px;
     }
+
+    .data-table {
+        min-width: 248px;
+    }
+
+    .panel-card {
+        padding: 19px 5px;
+    }
+
+    /* Take New Order Page Mobile Optimizations */
+    #view-create-order .field-label[style*="flex-direction: row"] {
+        flex-wrap: wrap;
+    }
+
+    #view-create-order .field-label[style*="flex-direction: row"]>div {
+        flex: 1 1 100% !important;
+    }
+
+    #addOrderLineButton {
+        width: 100%;
+        margin-top: 8px;
+        margin-bottom: 0 !important;
+    }
+
+    /* Push "Order Total" to opposite sides on small screens */
+    #view-create-order div[style*="justify-content: flex-end"] {
+        justify-content: space-between !important;
+    }
+
+    /* Ensure the discount input stays compact inside the scrollable table */
+    #orderDraftBody .searchable-item-input {
+        min-width: 65px;
+        width: 65px !important;
+    }
+
+    /* Force all tables to shrink to screen width */
+    .data-table {
+        min-width: 100% !important;
+    }
+
+    /* Reduce table padding and text size so all columns fit together */
+    .data-table th,
+    .data-table td {
+        padding: 8px 4px !important;
+        font-size: 11.5px !important;
+        white-space: normal !important;
+        word-break: break-word;
+    }
+
+    /* Compact inputs and buttons inside the table to save horizontal space */
+    #orderDraftBody .searchable-item-input {
+        width: 50px !important;
+        min-width: 50px !important;
+        padding: 0 4px !important;
+        font-size: 11px !important;
+    }
+
+    .data-table .ghost-button {
+        padding: 4px 6px !important;
+        font-size: 10px !important;
+    }
+
+    /* Completely hide the scrollbar and prevent x-axis scrolling */
+    .table-wrap {
+        overflow-x: hidden !important;
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
+    }
+
+    .table-wrap::-webkit-scrollbar {
+        display: none;
+        /* Chrome, Safari and Opera */
+    }
 }
