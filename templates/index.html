@@ -253,15 +253,14 @@
                                     <tr>
                                         <th>Code</th>
                                         <th>Item Name</th>
-                                        <th>Category</th>
                                         <th>Quantity Available</th>
-                                        <th>Selling Price</th>
+                                        <th>Price</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="inventoryBody">
                                     <tr class="empty-row">
-                                        <td colspan="6">Loading inventory…</td>
+                                        <td colspan="5">Loading inventory…</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -306,12 +305,11 @@
                             </div>
 
                             <div class="form-grid two-col" style="margin-bottom: 15px;">
-                                <!-- CUSTOM SEARCHABLE DROPDOWN -->
                                 <label class="field-label" style="position: relative; z-index: 10;">
                                     <span>Search & Select Part</span>
                                     <div class="searchable-item" id="partSearchContainer">
                                         <input type="text" id="partSearchInput" class="searchable-item-input"
-                                            placeholder="Search by name or code..." autocomplete="off">
+                                            placeholder="Search by name..." autocomplete="off">
                                         <input type="hidden" id="selectedPartId">
                                         <div class="searchable-item-menu" id="partSearchMenu">
                                             <!-- Populated by JS -->
@@ -334,10 +332,10 @@
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Code</th>
                                             <th>Item Name</th>
-                                            <th>Unit Price</th>
+                                            <th>Price</th>
                                             <th>Req Qty</th>
+                                            <th>Discount (₹)</th>
                                             <th>Total Price</th>
                                             <th style="width: 50px;">Remove</th>
                                         </tr>
@@ -377,25 +375,26 @@
                     </div>
 
                     <div class="toolbar-card">
-                        <button class="ghost-button" id="refreshStaffOrdersButton" type="button"
-                            style="margin-left: auto;">↻ Refresh</button>
+                        <div class="search-box large-search">
+                            <span>⌕</span>
+                            <input id="staffOrderSearch" type="search" placeholder="Search by Party Name…">
+                        </div>
+                        <button class="ghost-button" id="refreshStaffOrdersButton" type="button">↻ Refresh</button>
                     </div>
 
                     <section class="panel-card">
                         <div class="table-wrap">
-                            <table class="data-table">
+                            <table class="data-table staff-queue-table">
                                 <thead>
                                     <tr>
-                                        <th>Order ID</th>
                                         <th>Party</th>
-                                        <th>Date</th>
                                         <th>Status</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="staffOrdersBody">
                                     <tr class="empty-row">
-                                        <td colspan="5">Loading orders…</td>
+                                        <td colspan="3">Loading orders…</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -470,29 +469,26 @@
                 <input type="hidden" id="itemId">
                 <div class="form-grid">
                     <label class="field-label full-span">
-                        <span>Part Code <b>*</b></span>
-                        <input id="itemPartCode" type="text" required placeholder="e.g. BS-102">
+                        <span>Part Code (Auto-generated) <b>*</b></span>
+                        <input id="itemPartCode" type="text" required readonly
+                            style="background-color: #f1f5f9; cursor: not-allowed; border-color: var(--line-strong);"
+                            title="Automatically generated part code">
                     </label>
                     <label class="field-label full-span">
                         <span>Item Name <b>*</b></span>
                         <input id="itemName" type="text" required placeholder="e.g. Brake Shoe">
                     </label>
-                    <label class="field-label full-span">
-                        <span>Category <b>*</b></span>
-                        <input id="itemCategory" type="text" required placeholder="e.g. Brakes">
-                    </label>
-                    <label class="field-label">
-                        <span>Quantity Available <b>*</b></span>
-                        <input id="itemQuantity" type="number" min="0" step="1" required placeholder="e.g. 25">
-                    </label>
-                    <label class="field-label">
-                        <span>Purchase Price (₹) <b>*</b></span>
-                        <input id="itemPurchase" type="number" min="0" step="0.01" required placeholder="e.g. 150">
-                    </label>
-                    <label class="field-label">
-                        <span>Selling Price (₹) <b>*</b></span>
-                        <input id="itemSelling" type="number" min="0" step="0.01" required placeholder="e.g. 185">
-                    </label>
+
+                    <div class="form-grid two-col" style="grid-column: 1 / -1; gap: 14px;">
+                        <label class="field-label">
+                            <span>Quantity Available <b>*</b></span>
+                            <input id="itemQuantity" type="number" min="0" step="1" required placeholder="e.g. 25">
+                        </label>
+                        <label class="field-label">
+                            <span>Price (₹) <b>*</b></span>
+                            <input id="itemPrice" type="number" min="0" step="0.01" required placeholder="e.g. 185">
+                        </label>
+                    </div>
                 </div>
                 <div class="form-actions modal-actions">
                     <button class="ghost-button" id="cancelItemButton" type="button">Cancel</button>

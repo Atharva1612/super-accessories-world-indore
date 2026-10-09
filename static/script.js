@@ -2,6 +2,7 @@
 let inventory = [];
 let orderDraftItems = [];
 let currentStaffOrder = null;
+let staffOrdersList = []; // Added to store and filter staff orders
 
 // --- MOBILE SIDEBAR TOGGLE ---
 const body = document.body;
@@ -75,7 +76,7 @@ function renderInventory(data) {
 
     document.getElementById('inventoryCount').innerText = `${data.length} items`;
     if (data.length === 0) {
-        tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No inventory items found.</td></tr>`;
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No inventory items found.</td></tr>`;
         return;
     }
 
@@ -85,9 +86,8 @@ function renderInventory(data) {
             <tr>
                 <td><strong>${part.part_code}</strong></td>
                 <td>${part.name}</td>
-                <td>${part.category}</td>
                 <td style="${stockStyle}">${part.quantity}</td>
-                <td>₹${part.selling_price.toFixed(2)}</td>
+                <td>₹${part.price.toFixed(2)}</td>
                 <td style="display:flex; gap: 8px;">
                     <button class="ghost-button" style="padding: 5px 10px; min-height:0;" onclick='editItem(${JSON.stringify(part).replace(/'/g, "&apos;")})'>Edit</button>
                     <button class="ghost-button" style="padding: 5px 10px; min-height:0; color:var(--red); border-color:var(--red-soft);" onclick='deleteItem(${part.id})'>Del</button>
@@ -97,10 +97,15 @@ function renderInventory(data) {
     });
 }
 
+function generatePartCode() {
+    return 'PRT-' + Math.random().toString(36).substring(2, 6).toUpperCase() + Math.floor(100 + Math.random() * 900);
+}
+
 const itemModal = 'itemModalBackdrop';
 document.getElementById('openAddItemButton')?.addEventListener('click', () => {
     document.getElementById('itemForm').reset();
     document.getElementById('itemId').value = '';
+    document.getElementById('itemPartCode').value = generatePartCode();
     document.getElementById('itemModalTitle').innerText = 'Add Item';
     openModal(itemModal);
 });
@@ -117,10 +122,8 @@ function editItem(part) {
     document.getElementById('itemId').value = part.id;
     document.getElementById('itemPartCode').value = part.part_code;
     document.getElementById('itemName').value = part.name;
-    document.getElementById('itemCategory').value = part.category;
     document.getElementById('itemQuantity').value = part.quantity;
-    document.getElementById('itemPurchase').value = part.purchase_price;
-    document.getElementById('itemSelling').value = part.selling_price;
+    document.getElementById('itemPrice').value = part.price;
     document.getElementById('itemModalTitle').innerText = 'Edit Item';
     openModal(itemModal);
 }
@@ -131,10 +134,8 @@ document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
     const payload = {
         part_code: document.getElementById('itemPartCode').value,
         name: document.getElementById('itemName').value,
-        category: document.getElementById('itemCategory').value,
         quantity: document.getElementById('itemQuantity').value,
-        purchase_price: document.getElementById('itemPurchase').value,
-        selling_price: document.getElementById('itemSelling').value
+        price: document.getElementById('itemPrice').value
     };
 
     try {
@@ -161,7 +162,7 @@ async function deleteItem(id) {
 }
 
 
-// --- 2. ADMIN ORDER CREATION (SEARCHABLE DROPDOWN INTEGRATION) ---
+// --- 2. ADMIN ORDER CREATION (SEARCHABLE DROPDOWN) ---
 async function fetchInventoryForDropdown() {
     if (inventory.length === 0) {
         const res = await fetch('/api/parts');
@@ -187,9 +188,9 @@ function renderPartSearchMenu(items) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'searchable-item-option';
-        btn.innerHTML = `<strong>${p.part_code} - ${p.name}</strong><small>Stock: ${p.quantity} | ₹${p.selling_price.toFixed(2)}</small>`;
+        btn.innerHTML = `<strong>${p.name}</strong><small>Stock: ${p.quantity} | ₹${p.price.toFixed(2)}</small>`;
         btn.onclick = () => {
-            document.getElementById('partSearchInput').value = `${p.part_code} - ${p.name}`;
+            document.getElementById('partSearchInput').value = p.name;
             document.getElementById('selectedPartId').value = p.id;
             document.getElementById('partSearchContainer').classList.remove('open');
         };
@@ -235,12 +236,17 @@ document.getElementById('addOrderLineButton')?.addEventListener('click', () => {
 
     const part = inventory.find(p => p.id == partId);
 
+    if (reqQty > part.quantity) {
+        return showToast(`Cannot add ${reqQty}. Only ${part.quantity} available in stock.`, 'error');
+    }
+
     orderDraftItems.push({
         part_id: part.id,
         part_code: part.part_code,
         name: part.name,
         requested_qty: reqQty,
-        selling_price: part.selling_price
+        price: part.price,
+        discount: 0
     });
 
     document.getElementById('partSearchInput').value = '';
@@ -251,6 +257,13 @@ document.getElementById('addOrderLineButton')?.addEventListener('click', () => {
 });
 
 function removeDraftLine(idx) { orderDraftItems.splice(idx, 1); renderDraft(); }
+
+function updateDiscount(idx, val) {
+    let discount = parseFloat(val);
+    if (isNaN(discount) || discount < 0) discount = 0;
+    orderDraftItems[idx].discount = discount;
+    renderDraft();
+}
 
 function renderDraft() {
     const tbody = document.getElementById('orderDraftBody');
@@ -268,14 +281,16 @@ function renderDraft() {
     let grandTotal = 0;
 
     orderDraftItems.forEach((i, idx) => {
-        const lineTotal = i.requested_qty * i.selling_price;
+        const lineTotal = Math.max(0, (i.requested_qty * i.price) - i.discount);
         grandTotal += lineTotal;
         tbody.innerHTML += `
             <tr>
-                <td><strong>${i.part_code}</strong></td>
-                <td>${i.name}</td>
-                <td>₹${i.selling_price.toFixed(2)}</td>
+                <td><strong>${i.name}</strong></td>
+                <td>₹${i.price.toFixed(2)}</td>
                 <td>${i.requested_qty}</td>
+                <td>
+                    <input type="number" class="searchable-item-input" style="width: 80px; padding: 0 8px; height: 32px;" min="0" value="${i.discount}" onchange="updateDiscount(${idx}, this.value)">
+                </td>
                 <td><strong>₹${lineTotal.toFixed(2)}</strong></td>
                 <td><button type="button" class="ghost-button" style="color:var(--red); padding:5px; min-height:0;" onclick="removeDraftLine(${idx})">X</button></td>
             </tr>
@@ -349,36 +364,46 @@ async function fetchStaffOrders() {
     try {
         const endpoint = window.APP_MODE === 'staff' ? `/api/staff/${window.SHOP_SLUG}/orders` : `/api/orders`;
         const res = await fetch(endpoint);
-        const orders = await res.json();
-
-        const tbody = document.getElementById('staffOrdersBody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        if (orders.length === 0) {
-            tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No pending orders.</td></tr>`;
-            return;
-        }
-
-        orders.forEach(o => {
-            const badgeClass = o.status === 'Pending' ? 'pending' : (o.status === 'Completed' ? 'completed' : 'checked');
-            const actionBtn = (o.status === 'Pending' && window.APP_MODE === 'staff')
-                ? `<button class="primary-button" style="padding: 6px 12px; min-height: 0;" onclick='openStaffOrder(${JSON.stringify(o).replace(/'/g, "&apos;")})'>Check Stock</button>`
-                : `<button class="secondary-button" style="padding: 6px 12px; min-height: 0;" onclick='openStaffOrder(${JSON.stringify(o).replace(/'/g, "&apos;")})'>View</button>`;
-
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>#${o.id}</strong></td>
-                    <td>${o.customer_name}</td>
-                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
-                    <td><span class="status-badge ${badgeClass}">${o.status}</span></td>
-                    <td>${actionBtn}</td>
-                </tr>
-            `;
-        });
+        staffOrdersList = await res.json();
+        renderStaffOrders(staffOrdersList);
     } catch (e) { }
 }
 
+function renderStaffOrders(orders) {
+    const tbody = document.getElementById('staffOrdersBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (orders.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="3">No orders found.</td></tr>`;
+        return;
+    }
+
+    orders.forEach(o => {
+        const badgeClass = o.status === 'Pending' ? 'pending' : (o.status === 'Completed' ? 'completed' : 'checked');
+        const actionBtn = (o.status === 'Pending' && window.APP_MODE === 'staff')
+            ? `<button class="primary-button" style="padding: 6px 12px; min-height: 0;" onclick='openStaffOrder(${JSON.stringify(o).replace(/'/g, "&apos;")})'>Check Stock</button>`
+            : `<button class="secondary-button" style="padding: 6px 12px; min-height: 0;" onclick='openStaffOrder(${JSON.stringify(o).replace(/'/g, "&apos;")})'>View</button>`;
+
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${o.customer_name}</strong></td>
+                <td><span class="status-badge ${badgeClass}">${o.status}</span></td>
+                <td>${actionBtn}</td>
+            </tr>
+        `;
+    });
+}
+
 document.getElementById('refreshStaffOrdersButton')?.addEventListener('click', fetchStaffOrders);
+
+document.getElementById('staffOrderSearch')?.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    const filtered = staffOrdersList.filter(o =>
+        o.customer_name.toLowerCase().includes(q) ||
+        o.id.toString().includes(q)
+    );
+    renderStaffOrders(filtered);
+});
 
 function openStaffOrder(order) {
     currentStaffOrder = order;
@@ -428,7 +453,6 @@ function openStaffOrder(order) {
 document.getElementById('staffCheckingForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!currentStaffOrder) return;
-    if (!confirm('Complete order and permanently deduct these quantities from master inventory?')) return;
 
     const rows = document.querySelectorAll('#staffOrderItemsBody tr');
     const updates = Array.from(rows).map(r => ({

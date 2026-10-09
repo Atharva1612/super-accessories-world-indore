@@ -35,15 +35,14 @@ def init_db():
             FOREIGN KEY (shop_id) REFERENCES shops (id)
         )''')
         
+        # SCHEMA UPDATED: Removed category, combined purchase/selling price into 'price'
         cursor.execute('''CREATE TABLE IF NOT EXISTS parts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             shop_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             part_code TEXT NOT NULL,
-            category TEXT NOT NULL,
             quantity INTEGER NOT NULL CHECK (quantity >= 0),
-            purchase_price REAL NOT NULL CHECK (purchase_price >= 0),
-            selling_price REAL NOT NULL CHECK (selling_price >= 0),
+            price REAL NOT NULL CHECK (price >= 0),
             FOREIGN KEY (shop_id) REFERENCES shops (id),
             UNIQUE(shop_id, part_code)
         )''')
@@ -171,10 +170,9 @@ def api_parts():
         data = request.json
         try:
             db.execute('''
-                INSERT INTO parts (shop_id, name, part_code, category, quantity, purchase_price, selling_price)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (shop_id, data['name'], data['part_code'], data['category'], 
-                  int(data['quantity']), float(data['purchase_price']), float(data['selling_price'])))
+                INSERT INTO parts (shop_id, name, part_code, quantity, price)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (shop_id, data['name'], data['part_code'], int(data['quantity']), float(data['price'])))
             db.commit()
             return jsonify({'success': True})
         except sqlite3.IntegrityError:
@@ -197,10 +195,9 @@ def api_part_detail(part_id):
         data = request.json
         try:
             db.execute('''
-                UPDATE parts SET name=?, part_code=?, category=?, quantity=?, purchase_price=?, selling_price=?
+                UPDATE parts SET name=?, part_code=?, quantity=?, price=?
                 WHERE id = ? AND shop_id = ?
-            ''', (data['name'], data['part_code'], data['category'], 
-                  int(data['quantity']), float(data['purchase_price']), float(data['selling_price']), part_id, shop_id))
+            ''', (data['name'], data['part_code'], int(data['quantity']), float(data['price']), part_id, shop_id))
             db.commit()
             return jsonify({'success': True})
         except sqlite3.IntegrityError:
@@ -310,25 +307,21 @@ def api_staff_orders(shop_slug):
                 avail_qty = int(item['available_qty'])
                 item_id = item['item_id']
                 
-                # Retrieve the specific part ID for stock deduction
                 oi = cursor.execute("SELECT part_id FROM order_items WHERE id = ? AND order_id = ?", (item_id, order_id)).fetchone()
                 if not oi:
                     continue
                     
                 part_id = oi['part_id']
                 
-                # Update the order line item remarks and quantity
                 cursor.execute('''
                     UPDATE order_items 
                     SET available_qty = ?, remarks = ? 
                     WHERE id = ?
                 ''', (avail_qty, item.get('remarks', ''), item_id))
                 
-                # Automatically deduct from inventory stock
                 if avail_qty > 0:
                     cursor.execute("UPDATE parts SET quantity = quantity - ? WHERE id = ?", (avail_qty, part_id))
             
-            # Change status directly to Completed
             cursor.execute("UPDATE orders SET status = 'Completed' WHERE id = ?", (order_id,))
             db.commit()
             return jsonify({'success': True})
